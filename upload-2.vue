@@ -1,18 +1,15 @@
 <template>
 <div class="vue-image-crop-upload" v-show="value">
     <div class="vicp-wrap">
-        <div class="vicp-close" @click="off">
-            <i class="vicp-icon4"></i>
-        </div>
-
         <div class="vicp-step1" v-show="step == 1">
-            <div class="vicp-drop-area" @dragleave="preventDefault" @dragover="preventDefault" @dragenter="preventDefault" @click="handleClick" @drop="handleChange">
+            <div class="vicp-drop-area" @dragleave="preventDefault" @dragover="preventDefault" @dragenter="preventDefault">
                 <i class="vicp-icon1" v-show="loading != 1">
 					<i class="vicp-icon1-arrow"></i>
                 <i class="vicp-icon1-body"></i>
                 <i class="vicp-icon1-bottom"></i>
                 </i>
-                <span class="vicp-hint" v-show="loading !== 1">{{ lang.hint }}</span>
+                <input id="target" class="center" v-show="false">
+                <button type="button" @click="handleUpload">Upload</button>
                 <span class="vicp-no-supported-hint" v-show="!isSupported">{{ lang.noSupported }}</span>
                 <input type="file" v-show="false" v-if="step == 1" @change="handleChange" ref="fileinput">
             </div>
@@ -20,7 +17,7 @@
                 <i class="vicp-icon2"></i> {{ errorMsg }}
             </div>
             <div class="vicp-operate">
-                <a @click="off" @mousedown="ripple">{{ lang.btn.off }}</a>
+                <button @click="off" @mousedown="ripple">{{ lang.btn.off }}</button>
             </div>
         </div>
 
@@ -68,29 +65,11 @@
                 </div>
             </div>
             <div class="vicp-operate">
-                <a @click="setStep(1)" @mousedown="ripple">{{ lang.btn.back }}</a>
-                <a class="vicp-operate-btn" @click="prepareUpload" @mousedown="ripple">{{ lang.btn.save }}</a>
+                <button @click="handleBack" @mousedown="ripple">{{ lang.btn.back }}</button>
+                <button class="vicp-operate-btn" @click="prepareUpload" @mousedown="ripple">{{ lang.btn.save }}</button>
             </div>
         </div>
 
-        <div class="vicp-step3" v-if="step == 3">
-            <div class="vicp-upload">
-                <span class="vicp-loading" v-show="loading === 1">{{ lang.loading }}</span>
-                <div class="vicp-progress-wrap">
-                    <span class="vicp-progress" v-show="loading === 1" :style="progressStyle"></span>
-                </div>
-                <div class="vicp-error" v-show="hasError">
-                    <i class="vicp-icon2"></i> {{ errorMsg }}
-                </div>
-                <div class="vicp-success" v-show="loading === 2">
-                    <i class="vicp-icon3"></i> {{ lang.success }}
-                </div>
-            </div>
-            <div class="vicp-operate">
-                <a @click="setStep(2)" @mousedown="ripple">{{ lang.btn.back }}</a>
-                <a @click="off" @mousedown="ripple">{{ lang.btn.close }}</a>
-            </div>
-        </div>
         <canvas v-show="false" :width="width" :height="height" ref="canvas"></canvas>
     </div>
 </div>
@@ -107,6 +86,12 @@ import effectRipple from './utils/effectRipple.js';
 export default {
     props: {
         // 域，上传文件name，触发事件会带上（如果一个页面多个图片上传控件，可以做区分
+        onUploadError: {
+          type: Function,
+        },
+        onSave: {
+          type: Function,
+        },
         field: {
             type: String,
             'default': 'avatar'
@@ -197,6 +182,7 @@ export default {
             isSupported = false;
         }
         return {
+            imageBase64String: '',
             // 图片的mime
             mime,
 
@@ -370,9 +356,20 @@ export default {
         }
     },
     methods: {
+      handleBack() {
+        this.imageBase64String = '';
+        this.setStep(1);
+      },
+        handleUpload(e) {
+          const image = document.getElementById('target').value;
+          if (!image) return this.onUploadError();
+
+          this.sourceImgUrl = document.getElementById('target').value;
+          this.startCrop();
+        },
         // 点击波纹效果
         ripple(e) {
-            effectRipple(e);
+            return;
         },
         // 关闭控件
         off() {
@@ -484,11 +481,11 @@ export default {
                     x = 0,
                     y = 0;
                 // 图片像素不达标
-                if (nWidth < width || nHeight < height) {
-                    that.hasError = true;
-                    that.errorMsg = lang.error.lowestPx + width + '*' + height;
-                    return false;
-                }
+                // if (nWidth < width || nHeight < height) {
+                //     that.hasError = true;
+                //     that.errorMsg = lang.error.lowestPx + width + '*' + height;
+                //     return false;
+                // }
                 if (ratio > nRatio) {
                     h = w / nRatio;
                     y = (sim.height - h) / 2;
@@ -709,95 +706,12 @@ export default {
             that.createImgUrl = canvas.toDataURL(mime);
         },
         prepareUpload(){
-            let {
-                url,
-                createImgUrl,
-                field,
-                ki
-            } = this;
-            this.$emit('crop-success', createImgUrl, field, ki);
-            if(typeof url == 'string' && url){
-                this.upload();
-            }else{
-                this.off();
-            }
+            this.onSave(this.createImgUrl);
+            this.sourceImg = null;
+            this.sourceImgUrl = '';
+            this.createImgUrl = '';
+            this.setStep(1);
         },
-        // 上传图片
-        upload() {
-            let that = this,
-                {
-                    lang,
-                    imgFormat,
-                    mime,
-                    url,
-                    params,
-                    headers,
-                    field,
-                    ki,
-                    createImgUrl
-                } = this,
-                fmData = new FormData();
-            fmData.append(field, data2blob(createImgUrl, mime), field + '.' + imgFormat);
-
-            // 添加其他参数
-            if (typeof params == 'object' && params) {
-                Object.keys(params).forEach((k) => {
-                    fmData.append(k, params[k]);
-                })
-            }
-
-            // 监听进度回调
-            const uploadProgress = function(event) {
-                if (event.lengthComputable) {
-                    that.progress = 100 * Math.round(event.loaded) / event.total;
-                }
-            };
-
-            // 上传文件
-            that.reset();
-            that.loading = 1;
-            that.setStep(3);
-            new Promise(function(resolve, reject) {
-                let client = new XMLHttpRequest();
-                client.open('POST', url, true);
-                client.onreadystatechange = function() {
-                    if (this.readyState !== 4) {
-                        return;
-                    }
-                    if (this.status === 200 || this.status === 201) {
-                        resolve(JSON.parse(this.responseText));
-                    } else {
-                        reject(this.status);
-                    }
-                };
-                client.upload.addEventListener("progress", uploadProgress, false); //监听进度
-                // 设置header
-                if (typeof headers == 'object' && headers) {
-                    Object.keys(headers).forEach((k) => {
-                        client.setRequestHeader(k, headers[k]);
-                    })
-                }
-                client.send(fmData);
-            }).then(
-                // 上传成功
-                function(resData) {
-                    if (that.value) {
-                        that.loading = 2;
-                        that.$emit('crop-upload-success', resData, field, ki);
-                    }
-
-                },
-                // 上传失败
-                function(sts) {
-                    if (that.value) {
-                        that.loading = 3;
-                        that.hasError = true;
-                        that.errorMsg = lang.fail;
-                        that.$emit('crop-upload-fail', sts, field, ki);
-                    }
-                }
-            );
-        }
     }
 }
 
@@ -835,7 +749,12 @@ export default {
     opacity: 1;
     -webkit-transform: scale(1) translatey(0);
             transform: scale(1) translatey(0); } }
-
+.center {
+  display: block;
+  margin: auto;
+  width: 60%;
+  text-align: center;
+}
 .vue-image-crop-upload {
   position: fixed;
   display: block;
@@ -965,10 +884,6 @@ export default {
         text-align: center;
         color: #666;
         font-size: 14px; }
-      .vue-image-crop-upload .vicp-wrap .vicp-step1 .vicp-drop-area:hover {
-        cursor: pointer;
-        border-color: rgba(0, 0, 0, 0.1);
-        background-color: rgba(0, 0, 0, 0.05); }
     .vue-image-crop-upload .vicp-wrap .vicp-step2 .vicp-crop {
       overflow: hidden; }
       .vue-image-crop-upload .vicp-wrap .vicp-step2 .vicp-crop .vicp-crop-left {

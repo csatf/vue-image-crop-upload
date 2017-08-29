@@ -109,7 +109,7 @@
 import language from './utils/language.js';
 import mimes from './utils/mimes.js';
 import data2blob from './utils/data2blob.js';
-import effectRipple from './utils/effectRipple.js';
+// import effectRipple from './utils/effectRipple.js';
 
 export default {
     props: {
@@ -378,7 +378,7 @@ export default {
     methods: {
         // 点击波纹效果
         ripple(e) {
-            effectRipple(e);
+            // effectRipple(e);
         },
         // 关闭控件
         off() {

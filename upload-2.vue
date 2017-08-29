@@ -81,7 +81,7 @@
 import language from './utils/language.js';
 import mimes from './utils/mimes.js';
 import data2blob from './utils/data2blob.js';
-import effectRipple from './utils/effectRipple.js';
+// import effectRipple from './utils/effectRipple.js';
 
 export default {
     props: {
@@ -369,7 +369,7 @@ export default {
         },
         // 点击波纹效果
         ripple(e) {
-            return;
+            // effectRipple(e);
         },
         // 关闭控件
         off() {
